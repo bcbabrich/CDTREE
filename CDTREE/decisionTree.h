@@ -5,10 +5,13 @@
 #include <iostream>
 #include <sstream>
 #include <fstream>
+#include <set>
+#include <stdlib.h> // srand, rand
 #include "vector"
 using namespace std;
 
 class decisionTree {
+
     // dataset
     // vector of int vectors representing data in the file.
     // filled in constructor
@@ -25,8 +28,9 @@ public:
     vector<vector<int>> colVals;
 
     decisionTree(string);
-    int col_to_split_on(); // make this private once training function is written?
+    int col_to_split_on(vector<vector<int>> binMask); // make this private once training function is written?
     vector<vector<int>> gen_bin_mask(int col, int val, vector<vector<int>> binMask);
+    int is_base_case(vector<vector<int>> binMask);
 };
 
 /*
@@ -127,13 +131,15 @@ decisionTree::decisionTree(string filename) {
 
 /*
 Finds best column to split on based on column scores
-- Takes in nothing. Called during training loop, operates on data.
+- Takes in a binary mask. 
+-- Does not increment values at values in mask.
+- Called during training loop, operates on data.
 - Outputs an int corresponding to a column index.
 -- Assumptions:
 --- data is square
 --- labels for data are at the end of their rows
 */
-int decisionTree::col_to_split_on() {
+int decisionTree::col_to_split_on(vector<vector<int>> binMask) {
     /*
     Initialize colCounts variable, a three-dimensional vector
     - 1st dimension: number of columns in data ... "colCounts"
@@ -197,10 +203,38 @@ int decisionTree::col_to_split_on() {
                 }
             }
 
-            // increment corresponding index in colCounts
-            // VS throws an "uninitialized" error here,
-            // even if I initialize the second two indices...
-            colCounts.at(col).at(lblIdx).at(valIdx)++;
+            /*
+            Now we will increment corresponding index in colCounts.
+            But we must do so in accordance with the binary mask.
+            */
+            bool increm = true;
+
+            // these following two for loops could be done with a "check if element is in vector" method, maybe...
+
+            // check if current row is omitted by mask 
+            if (!binMask.at(1).empty()) { // during the root splitting, mask will be empty
+                for (int maskRowIdx = 0; maskRowIdx < binMask.at(1).size(); maskRowIdx++) {
+                    if (row == binMask.at(1).at(maskRowIdx)) {
+                        increm = false;
+                    }
+                }
+            }
+
+            // check if current column is omitted by mask
+            if (!binMask.at(1).empty()) {
+                for (int maskColIdx = 0; maskColIdx < binMask.at(0).size(); maskColIdx++) {
+                    if (col == binMask.at(0).at(maskColIdx)) {
+                        increm = false;
+                    }
+                }
+            }
+            
+
+            // only increment values not in binary mask
+            if (increm) {
+                colCounts.at(col).at(lblIdx).at(valIdx)++;
+            }
+            
         }
     }
 
@@ -265,22 +299,192 @@ Set binary mask given current binary mask and new column to "split" on
 vector<vector<int>> decisionTree::gen_bin_mask(int col, int val, vector<vector<int>> binMask) {
     // when function is first called, binMask will be empty.
     // push back two empty vectors onto it to be filled with ommitted columns and rows respectively.
+    // return that empty binMask
     if (binMask.empty()) {
         vector<int> ommittedCols;
         binMask.push_back(ommittedCols);
         vector<int> ommittedRows;
         binMask.push_back(ommittedRows);
+        return binMask;
+    }
+    else {
+        // since we've already scored for column col, it gets ommitted
+        // but we don't want any duplicates in our omitted columns
+        // this would mess up our indexing
+        // so check if col is already in omitted columns before pushing
+        // (we could use a set instead but that would also make indexing harder)
+        bool colFound = false;
+        for (int maskColIdx = 0; maskColIdx < binMask.at(0).size(); maskColIdx++) {
+            if (binMask.at(0).at(maskColIdx) == col) {
+                colFound = true;
+            }
+        }
+        if (!colFound) {
+            binMask.at(0).push_back(col);
+        }
+
+        // any row that has a val in column col NOT equal to val gets omitted
+        for (int row = 0; row < data.size(); row++) {
+            if (data.at(row).at(col) != val) {
+                // identical logic as with columns above: we don't want any duplicates
+                bool rowFound = false;
+                for (int maskRowIdx = 0; maskRowIdx < binMask.at(1).size(); maskRowIdx++) {
+                    if (binMask.at(1).at(maskRowIdx) == row) {
+                        rowFound = true;
+                    }
+                }
+                if (!rowFound) {
+                    binMask.at(1).push_back(row);
+                }
+            }
+        }
+        return binMask;
+    }
+}
+
+/*
+Check if given binary bask creates a base case.
+Returns NULL if no base case (default at bottom of function).
+Returns int guess if base case (premature returns throughout function).
+There are three known base cases.
+Here they are in the order we check them:
+- "no rows left": the mask eliminates all data values
+-- Return a random guess from all labels
+- "all labels equal": the mask leaves only one label value. 
+-- Return that label value if found.
+- "no columns left": all columns have been split on
+-- count how many of each label there is left.
+--- return the label with the maximum count
+--- return a random guess from labels left if all labels counts are equal
+*/
+int decisionTree::is_base_case(vector<vector<int>> binMask) {
+    // the quickest thing to check is the "no data case", so we do that first
+    // there is an optimization to be made here... check your notebook
+    if (binMask.at(1).size() == data.size()) {
+        // in this base case, we return a random guess from all possible labels
+        // first we need to generate a random index from the labels vector in colVals
+        int lblInd = rand() % colVals.at(colVals.size() - 1).size();
+
+        // then return the value at that index
+        return colVals.at(colVals.size() - 1).at(lblInd);
     }
 
-    // since we've already scored for column col, it gets ommitted
-    binMask.at(0).push_back(col);
+    // next, check for base case: single label left
+    // at this point, we know that there are rows left
 
-    // any row that has a val in column col NOT equal to val gets omitted
+    // initialize observed labels as set because we only care about unique found labels
+    set<int> observedLbls; 
+
+    // initialize and empty label counts vector
+    // - to be used in checking third base case
+    vector<int> lblCounts;
+    for (int lblIdx = 0; lblIdx < colVals.at(colVals.size() - 1).size(); lblIdx++) {
+        lblCounts.push_back(0);
+    }
+
+    // iterate over all rows left visible by mask
     for (int row = 0; row < data.size(); row++) {
-        if (data.at(row).at(col) != val) {
-            binMask.at(1).push_back(row);
+        int lbl = data.at(row).at(data.at(row).size() - 1); // legibility
+
+        // check if row is in mask
+        bool rowFound = false;
+        for (int maskRowIdx = 0; maskRowIdx < binMask.at(1).size(); maskRowIdx++) {
+            if (binMask.at(1).at(maskRowIdx) == row) {
+                rowFound = true;
+            }
+        }
+
+        // if it isn't, add row's label to observedLbls
+        if (!rowFound) {
+            observedLbls.insert(lbl);
+
+            // additionally, get the index of that label in colVals
+            // and increment that index in lblCounts
+            if (!rowFound) {
+                int lblValIdx;
+                for (int lblIdx = 0; lblIdx < colVals.at(colVals.size() - 1).size(); lblIdx++) {
+                    if (colVals.at(colVals.size() - 1).at(lblIdx) == lbl) {
+                        lblValIdx = lblIdx;
+                        // break could go here? as well as above in colCounts?
+                    }
+                }
+
+                lblCounts.at(lblValIdx)++;
+            }
         }
     }
 
-    return binMask;
+    // if only one unique label was observed, our first base case was hit
+    // so return the int that's at the beginning of observed labels,
+    // i.e., the only element in the set
+    if (observedLbls.size() == 1) {
+        set<int>::iterator it = observedLbls.begin();
+        return *it;
+    }
+
+    /*
+    now we know there are at least two types of labels left
+    the last case to check for is the "no columns left" case
+    data being square is key here
+    at this point we know there are rows left and at least two different types of label values
+    */
+
+    // -2 here because we don't want to include the label column or the single column that's left
+    else if (binMask.at(0).size() == data.at(0).size() - 2) {
+        // if there is an equal number of each label value type left over by mask,
+        // we return a random guess from whatever labels are left
+
+        /*
+        To check if all non-zero lblCounts values are equal: 
+        - cycle through all labels counts
+        - the first non-zero count gets saved to omni count and the non-zero label counts vector
+        - any other non-zero count gets saved to label counts vector as well
+        - but if another non-zero count isn't equal to omni count, allEqual is set to false
+        */
+        int omniCount = -1;
+        bool allEqual = true;
+        vector<int> nonZeroLblCntIdxs; // save indices of non-zero lable counts
+        for (int lblCntIdx = 0; lblCntIdx < lblCounts.size(); lblCntIdx++) {
+            if (lblCounts.at(lblCntIdx) > 0 and omniCount == -1) {
+                omniCount = lblCounts.at(lblCntIdx);
+                nonZeroLblCntIdxs.push_back(lblCntIdx);
+            }
+            else if (lblCounts.at(lblCntIdx) > 0 && lblCounts.at(lblCntIdx) != omniCount) {
+                allEqual = false;
+                // break?
+            }
+            else if (lblCounts.at(lblCntIdx) > 0) {
+                nonZeroLblCntIdxs.push_back(lblCntIdx);
+            }
+        }
+
+        // if the counts were all equal, randomly choose one of the ones that was left
+        if (allEqual) {
+            // generate a random index into nonZeroLblCntIdxs
+            int randInd = rand() % nonZeroLblCntIdxs.size();
+
+            // get that index
+            int lblIdx = nonZeroLblCntIdxs.at(randInd);
+
+            // return label at lblIdx in cols
+            return colVals.at(colVals.size() - 1).at(lblIdx);
+        }
+        // if the counts were not all equal, return the label with the maximum count
+        else {
+            // get index of max element
+            int max = 0;
+            int maxIdx;
+            for (int cntIdx = 0; cntIdx < lblCounts.size(); cntIdx++) {
+                if (lblCounts.at(cntIdx) > max) {
+                    maxIdx = cntIdx;
+                }
+            }
+
+            // return label at maxIdx in cols
+            return colVals.at(colVals.size() - 1).at(maxIdx);
+        }
+    }
+
+    // no base cases were hit
+    return NULL;
 }
