@@ -17,9 +17,33 @@ class decisionTree {
     // filled in constructor
     vector<vector<int>> data;
 
-// all function descriptions provided at actual functions
 public:
-    
+    /*
+    tree node
+    struct with three member variables:
+    1. int column value.. refers to column split on by parent node
+    -- null in root's case
+    2. int column split on.. column this node splits on
+    -- value doesn't matter if guess is not null
+    3. int guess
+    -- null unless node is a base case
+    4. vector of node pointers called "children"
+    -- pointers to all of the children of this node
+    -- also doesn't matter if node is base case
+    ...
+    this will become private once training function is moved over here
+    */
+    struct Node
+    {
+        int colVal = NULL;
+        int colSplitOn = NULL;;
+        int guess = NULL;
+        vector<Node*> children;
+    };
+
+    // always instantiate a root node
+    // this might change when training loop is moved into decisionTree class...
+    Node root;
 
     // all the possible values each column can have
     // filled in constructor
@@ -27,8 +51,9 @@ public:
     // TODO: make colVals private again when training function written
     vector<vector<int>> colVals;
 
+    // all function descriptions provided at actual functions
     decisionTree(string);
-    int col_to_split_on(vector<vector<int>> binMask); // make this private once training function is written?
+    int col_to_split_on(vector<vector<int>> binMask); // make this private once training function is written
     vector<vector<int>> gen_bin_mask(int col, int val, vector<vector<int>> binMask);
     int is_base_case(vector<vector<int>> binMask);
 };
