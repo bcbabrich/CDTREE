@@ -56,6 +56,8 @@ public:
     int col_to_split_on(vector<vector<int>> binMask); // make this private once training function is written
     vector<vector<int>> gen_bin_mask(int col, int val, vector<vector<int>> binMask);
     int is_base_case(vector<vector<int>> binMask);
+    void trainTree();
+    void recursiveTrain(vector<vector<int>> binMask, Node parentNode);
 };
 
 /*
@@ -512,4 +514,136 @@ int decisionTree::is_base_case(vector<vector<int>> binMask) {
 
     // no base cases were hit
     return NULL;
+}
+
+/*
+Entry point for building decision tree
+Checks what column to split from on root
+Then calls recursiveTrain on the children of root
+Assumes root is not a base case
+*/
+void decisionTree::trainTree() {
+    // generate initial binary mask (should be two empty int vectors)
+    vector<vector<int>> emptyMask;
+    vector<vector<int>> initMask = gen_bin_mask(0, 0, emptyMask);
+
+    // get first column to split on
+    int col0 = col_to_split_on(initMask);
+
+    // set column that root will split on
+    root.colSplitOn = col0;
+
+    // cycle through all colVals for found column
+    for (int colValIdx = 0; colValIdx < colVals.at(col0).size(); colValIdx++) {
+        // initialize child
+        // .. will this get destroyed once for loop is finished?
+        // a pointer to it gets pushed to root, so.. maybe not?
+        Node child;
+
+        // generate appropriate mask for this child
+        vector<vector<int>> intermMask = gen_bin_mask(col0, colVals.at(col0).at(colValIdx), initMask);
+        int guess = is_base_case(intermMask);
+
+        if (guess == NULL) {
+            int nextCol = col_to_split_on(intermMask);
+
+            // set properties of child and push a pointer to it onto the root's children
+            child.colVal = colVals.at(col0).at(colValIdx);
+            child.colSplitOn = nextCol;
+            root.children.push_back(&child);
+
+            // call recursive train on child
+            recursiveTrain(intermMask, child);
+        }
+        else {
+            // base case hit already!
+
+            // set properties of child 0 and push a pointer to it onto the root's children
+            child.colVal = colVals.at(col0).at(colValIdx);
+            child.guess = guess;
+            root.children.push_back(&child);
+        }
+    }
+}
+
+/*
+ +++++++++++++++++++++This is where the MAGIC happens, baby!+++++++++++++++++
+
+                                      /|
+                                     |\|
+                                     |||
+                                     |||
+                                     |||
+                                     |||
+                                     |||
+                                     |||
+                                  ~-[{o}]-~
+                                     |/|
+                                     |/|
+             ///~`     |\\_          `0'         =\\\\         . .
+            ,  |='  ,))\_| ~-_                    _)  \      _/_/|
+           / ,' ,;((((((    ~ \                  `~~~\-~-_ /~ (_/\
+         /' -~/~)))))))'\_   _/'                      \_  /'  D   |
+        (       (((((( ~-/ ~-/                          ~-;  /    \--_
+         ~~--|   ))''    ')  `                            `~~\_    \   )
+             :        (_  ~\           ,                    /~~-     ./
+              \        \_   )--__  /(_/)                   |    )    )|
+    ___       |_     \__/~-__    ~~   ,'      /,_;,   __--(   _/      |
+  //~~\`\    /' ~~~----|     ~~~~~~~~'        \-  ((~~    __-~        |
+((()   `\`\_(_     _-~~-\                      ``~~ ~~~~~~   \_      /
+ )))     ~----'   /      \                                   )       )
+  (         ;`~--'        :                                _-    ,;;(
+            |    `\       |                             _-~    ,;;;;)
+            |    /'`\     ;                          _-~          _/
+           /~   /    |    )                         /;;;''  ,;;:-~
+          |    /     / | /                         |;;'   ,''
+          /   /     |  \\|                         |   ,;(    -Tua Xiong
+        _/  /'       \  \_)                   .---__\_    \,--._______
+       ( )|'         (~-_|                   (;;'  ;;;~~~/' `;;|  `;;;\
+        ) `\_         |-_;;--__               ~~~----__/'    /'_______/
+        `----'       (   `~--_ ~~~;;------------~~~~~ ;;;'_/'
+                     `~~~~~~~~'~~~-----....___;;;____---~~
+
++++++++++++++++++++++......................................+++++++++++++++++
+
+I.e., the majority of the training is actually done here.
+..
+Takes in a binary mask and a parent node,
+gets column to split on based on binary mask,
+adds a child for each value of that column,
+and calls itself with new binary mask and child node if mask isn't a base case
+otherwise child is a base case and that branch ends.
+*/
+void decisionTree::recursiveTrain(vector<vector<int>> binMask, Node parentNode) {
+    // get column to split on
+    // int colSplitOn = col_to_split_on(binMask);
+
+    // cycle through all colVals for found column colSplitOn
+    for (int colValIdx = 0; colValIdx < colVals.at(parentNode.colSplitOn).size(); colValIdx++) {
+        // initialize child
+        Node child;
+
+        // generate appropriate mask for this child
+        vector<vector<int>> intermMask = gen_bin_mask(parentNode.colSplitOn, colVals.at(parentNode.colSplitOn).at(colValIdx), binMask);
+        int guess = is_base_case(intermMask);
+
+        if (guess == NULL) {
+            int nextCol = col_to_split_on(intermMask);
+
+            // set properties of child and push a pointer to it onto the root's children
+            child.colVal = colVals.at(parentNode.colSplitOn).at(colValIdx);
+            child.colSplitOn = nextCol;
+            parentNode.children.push_back(&child);
+
+            // call recursive train on child
+            recursiveTrain(intermMask, child);
+        }
+        else {
+            // base case hit
+            // set properties of child and push a pointer to it onto the parents's children
+            child.colVal = colVals.at(parentNode.colSplitOn).at(colValIdx);
+            child.guess = guess;
+            parentNode.children.push_back(&child);
+        }
+    }
 }
