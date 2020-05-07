@@ -10,6 +10,7 @@ using namespace std;
 int main()
 {
     bool recursiveTest = true;
+    bool printTest = false;
 
     if (recursiveTest) {
         // read in data
@@ -19,32 +20,43 @@ int main()
         // build decision tree
         myDecTree.trainTree();
 
-        decisionTree::Node child0 = *myDecTree.root.children.at(0);
-
         // printing test
-        queue<decisionTree::Node *> q; // Create a queue 
-        q.push(&myDecTree.root); // Enqueue root
-        while (!q.empty())
-        {
-            // for all nodes currently in the queue,
-            // print their values and enque their children
-            int n = q.size();
-            while (n > 0)
+        if (printTest) {
+            queue<decisionTree::Node*> q; // Create a queue 
+            q.push(&myDecTree.root); // Enqueue root
+            while (!q.empty())
             {
-                // Dequeue node from front of queue
-                decisionTree::Node * p = q.front();
-                q.pop();
-                cout << p->colVal << "," << p->colSplitOn << "," << p->guess << "    ";
+                // for all nodes currently in the queue,
+                // print their values and enque their children
+                int n = q.size();
+                while (n > 0)
+                {
+                    // Dequeue node from front of queue
+                    decisionTree::Node* p = q.front();
+                    q.pop();
+                    cout << p->colVal << "," << p->colSplitOn << "," << p->guess << "    ";
 
-                // Enqueue all children of the dequeued item 
-                for (int childIdx = 0; childIdx < p->children.size(); childIdx++)
-                    q.push(p->children.at(childIdx));
+                    // Enqueue all children of the dequeued item 
+                    for (int childIdx = 0; childIdx < p->children.size(); childIdx++)
+                        q.push(p->children.at(childIdx));
 
-                n--;
+                    n--;
+                }
+                cout << endl; // Print new line between two levels 
             }
-
-            cout << endl; // Print new line between two levels 
         }
+
+        // row prediction test
+        vector<int> datapoint1 = { 0, 121, 121, 0, 110 }; // shoudld set pred1 to 68
+        vector<int> datapoint2 = { 0, 121, 121, 110, 121 }; // should set pred2 to 68
+        vector<int> datapoint3 = { 0, 121, 121, 121, 121 }; // should set pred3 to 76
+        vector<int> datapoint4 = { 0, 121, 121, 0, 110 }; // should set pred4 to random guess
+
+        int pred1 = myDecTree.predictSingleRow(datapoint1); 
+        int pred2 = myDecTree.predictSingleRow(datapoint2);
+        int pred3 = myDecTree.predictSingleRow(datapoint3);
+        int pred4 = myDecTree.predictSingleRow(datapoint4);
+
     }
     else {
         // non-recursive training loop driver

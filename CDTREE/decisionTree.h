@@ -6,6 +6,7 @@
 #include <sstream>
 #include <fstream>
 #include <set>
+#include <time.h>
 #include <stdlib.h> // srand, rand
 #include "vector"
 using namespace std;
@@ -42,7 +43,6 @@ public:
     };
 
     // always instantiate a root node
-    // this might change when training loop is moved into decisionTree class...
     Node root;
 
     // all the possible values each column can have
@@ -57,7 +57,8 @@ public:
     vector<vector<int>> gen_bin_mask(int col, int val, vector<vector<int>> binMask);
     int is_base_case(vector<vector<int>> binMask);
     void trainTree();
-    void recursiveTrain(vector<vector<int>> binMask, Node parentNode);
+    void recursiveTrain(vector<vector<int>> binMask, Node * parentNode);
+    int predictSingleRow(vector<int> row);
 };
 
 /*
@@ -390,6 +391,7 @@ int decisionTree::is_base_case(vector<vector<int>> binMask) {
     if (binMask.at(1).size() == data.size()) {
         // in this base case, we return a random guess from all possible labels
         // first we need to generate a random index from the labels vector in colVals
+        srand(time(NULL)); // seed rand with current time, otherwise we will always get the same "random" number
         int lblInd = rand() % colVals.at(colVals.size() - 1).size();
 
         // then return the value at that index
@@ -478,7 +480,6 @@ int decisionTree::is_base_case(vector<vector<int>> binMask) {
             }
             else if (lblCounts.at(lblCntIdx) > 0 && lblCounts.at(lblCntIdx) != omniCount) {
                 allEqual = false;
-                // break?
             }
             else if (lblCounts.at(lblCntIdx) > 0) {
                 nonZeroLblCntIdxs.push_back(lblCntIdx);
@@ -521,6 +522,7 @@ Entry point for building decision tree
 Checks what column to split from on root
 Then calls recursiveTrain on the children of root
 Assumes root is not a base case
+This is not where the magic happens
 */
 void decisionTree::trainTree() {
     // generate initial binary mask (should be two empty int vectors)
@@ -538,7 +540,7 @@ void decisionTree::trainTree() {
         // initialize child
         // .. will this get destroyed once for loop is finished?
         // a pointer to it gets pushed to root, so.. maybe not?
-        Node child;
+        Node * child = new Node;
 
         // generate appropriate mask for this child
         vector<vector<int>> intermMask = gen_bin_mask(col0, colVals.at(col0).at(colValIdx), initMask);
@@ -548,9 +550,9 @@ void decisionTree::trainTree() {
             int nextCol = col_to_split_on(intermMask);
 
             // set properties of child and push a pointer to it onto the root's children
-            child.colVal = colVals.at(col0).at(colValIdx);
-            child.colSplitOn = nextCol;
-            root.children.push_back(&child);
+            child->colVal = colVals.at(col0).at(colValIdx);
+            child->colSplitOn = nextCol;
+            root.children.push_back(child);
 
             // call recursive train on child
             recursiveTrain(intermMask, child);
@@ -559,27 +561,27 @@ void decisionTree::trainTree() {
             // base case hit already!
 
             // set properties of child 0 and push a pointer to it onto the root's children
-            child.colVal = colVals.at(col0).at(colValIdx);
-            child.guess = guess;
-            root.children.push_back(&child);
+            child->colVal = colVals.at(col0).at(colValIdx);
+            child->guess = guess;
+            root.children.push_back(child);
         }
     }
 }
 
 /*
- +++++++++++++++++++++This is where the MAGIC happens, baby!+++++++++++++++++
+ +++++++++++++++++++++THIS is where the magic happens, baby!+++++++++++++++++
 
-                                      /|
-                                     |\|
-                                     |||
-                                     |||
-                                     |||
-                                     |||
-                                     |||
-                                     |||
-                                  ~-[{o}]-~
-                                     |/|
-                                     |/|
+                                -     /|    -
+                                -    |\|    -
+                                -    |||    -
+                                -    |||    -
+                                -    |||    -
+                                -    |||    -
+                                -    |||    -
+                                -    |||    -
+                                - ~-[{o}]-~ -
+                                -    |/|    -
+                                -    |/|    -
              ///~`     |\\_          `0'         =\\\\         . .
             ,  |='  ,))\_| ~-_                    _)  \      _/_/|
            / ,' ,;((((((    ~ \                  `~~~\-~-_ /~ (_/\
@@ -614,26 +616,27 @@ adds a child for each value of that column,
 and calls itself with new binary mask and child node if mask isn't a base case
 otherwise child is a base case and that branch ends.
 */
-void decisionTree::recursiveTrain(vector<vector<int>> binMask, Node parentNode) {
+void decisionTree::recursiveTrain(vector<vector<int>> binMask, Node * parentNode) {
     // get column to split on
     // int colSplitOn = col_to_split_on(binMask);
+    Node child0 = *root.children.at(1);
 
     // cycle through all colVals for found column colSplitOn
-    for (int colValIdx = 0; colValIdx < colVals.at(parentNode.colSplitOn).size(); colValIdx++) {
+    for (int colValIdx = 0; colValIdx < colVals.at(parentNode->colSplitOn).size(); colValIdx++) {
         // initialize child
-        Node child;
+        Node * child = new Node;
 
         // generate appropriate mask for this child
-        vector<vector<int>> intermMask = gen_bin_mask(parentNode.colSplitOn, colVals.at(parentNode.colSplitOn).at(colValIdx), binMask);
+        vector<vector<int>> intermMask = gen_bin_mask(parentNode->colSplitOn,colVals.at(parentNode->colSplitOn).at(colValIdx), binMask);
         int guess = is_base_case(intermMask);
 
         if (guess == NULL) {
             int nextCol = col_to_split_on(intermMask);
 
             // set properties of child and push a pointer to it onto the root's children
-            child.colVal = colVals.at(parentNode.colSplitOn).at(colValIdx);
-            child.colSplitOn = nextCol;
-            parentNode.children.push_back(&child);
+            child->colVal = colVals.at(parentNode->colSplitOn).at(colValIdx);
+            child->colSplitOn = nextCol;
+            parentNode->children.push_back(child);
 
             // call recursive train on child
             recursiveTrain(intermMask, child);
@@ -641,9 +644,40 @@ void decisionTree::recursiveTrain(vector<vector<int>> binMask, Node parentNode) 
         else {
             // base case hit
             // set properties of child and push a pointer to it onto the parents's children
-            child.colVal = colVals.at(parentNode.colSplitOn).at(colValIdx);
-            child.guess = guess;
-            parentNode.children.push_back(&child);
+            child->colVal = colVals.at(parentNode->colSplitOn).at(colValIdx);
+            child->guess = guess;
+            parentNode->children.push_back(child);
         }
     }
+}
+
+/*
+Given a new data row, use built tree to return an int guess
+To be used in loop over vector of new data rows
+*/
+int decisionTree::predictSingleRow(vector<int> row) {
+    Node* curNode = &root;
+
+    while (curNode->guess == NULL) {
+        // get column current node split on
+        int colSplitOn = curNode->colSplitOn;
+
+        // get colVal row has at that column
+        int colVal = row.at(colSplitOn);
+
+        // set curNode to the child of curNode with that colVal
+        // loop over children of current node
+        // find the index of the child with the colVal that matches row's colVal
+        int corChildIdx;
+        for (int childIdx = 0; childIdx < curNode->children.size(); childIdx++) {
+            if (curNode->children.at(childIdx)->colVal == colVal) {
+                corChildIdx = childIdx;
+            }
+        }
+        // set that child to curNode
+        curNode = curNode->children.at(corChildIdx);
+    }
+
+    // we must have hit a node with a non-null guess
+    return curNode->guess;
 }
