@@ -14,7 +14,7 @@ int main()
 
     if (recursiveTest) {
         // read in data
-        string filename = "C:/Users/Berett/Projects/CDTREE/Data/toyDataBinLabels.csv";
+        string filename = "C:/Users/Berett/Projects/CDTREE/Data/toyDataStringColumnsBinLabels.csv";
         decisionTree myDecTree(filename);
 
         // build decision tree
@@ -46,16 +46,23 @@ int main()
             }
         }
 
-        // row prediction test
-        vector<int> datapoint1 = { 0, 121, 121, 0, 110 }; // shoudld set pred1 to 68
-        vector<int> datapoint2 = { 0, 121, 121, 110, 121 }; // should set pred2 to 68
-        vector<int> datapoint3 = { 0, 121, 121, 121, 121 }; // should set pred3 to 76
-        vector<int> datapoint4 = { 0, 121, 121, 0, 110 }; // should set pred4 to random guess
+        // sing row prediction test
+        vector<int> datapoint1 = { 0, 2, 1, 0, 0 }; // should set pred1 to 4
+        vector<int> datapoint2 = { 0, 1, 1, 1, 1 }; // should set pred2 to 3
+        vector<int> datapoint3 = { 0, 1, 1, 2, 1 }; // should set pred3 to 4
+        vector<int> datapoint4 = { 0, 1, 1, 0, 2 }; // should set pred4 to random guess
+        int pred1 = myDecTree.predictSingleDataPoint(datapoint1);
+        int pred2 = myDecTree.predictSingleDataPoint(datapoint2);
+        int pred3 = myDecTree.predictSingleDataPoint(datapoint3);
+        int pred4 = myDecTree.predictSingleDataPoint(datapoint4);
 
-        int pred1 = myDecTree.predictSingleRow(datapoint1); 
-        int pred2 = myDecTree.predictSingleRow(datapoint2);
-        int pred3 = myDecTree.predictSingleRow(datapoint3);
-        int pred4 = myDecTree.predictSingleRow(datapoint4);
+        // multi row prediction test
+        vector<vector<int>> testData;
+        testData.push_back(datapoint1);
+        testData.push_back(datapoint2);
+        testData.push_back(datapoint3);
+        testData.push_back(datapoint4);
+        vector<int> preds = myDecTree.predictOnDataSet(testData);
 
     }
     else {

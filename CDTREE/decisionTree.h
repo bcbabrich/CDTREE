@@ -58,7 +58,8 @@ public:
     int is_base_case(vector<vector<int>> binMask);
     void trainTree();
     void recursiveTrain(vector<vector<int>> binMask, Node * parentNode);
-    int predictSingleRow(vector<int> row);
+    int predictSingleDataPoint(vector<int> row);
+    vector<int> predictOnDataSet(vector<vector<int>> dataSet);
 };
 
 /*
@@ -77,6 +78,9 @@ decisionTree::decisionTree(string filename) {
     bool firstLine = true;
     bool colIdx = 0;
 
+    // keep track of all column strings seen
+    vector<string> observedStrs;
+
     // begin file reading...
     if (myfile.is_open())
     {
@@ -94,62 +98,140 @@ decisionTree::decisionTree(string filename) {
             // Extract each integer
             char c;
             int val;
-            bool neg = false;
+            string str = "";
             while (ss >> c) {
-                // read in chars as ints
-                if (!neg) {
-                    val = c - 0;
-                }
-                else {
-                    // if the last token was a negative sign,
-                    // take negative of int value
-                    val = 0 - (c - 0);
-                    neg = false;
-                }
-
-                // place int val in current row
-                row.push_back(val);
-
-                // if we're still on the first line,
-                // add a new vector to colVals
-                // i.e., we're still finding new columns
-                if (firstLine) {
-                    vector<int> newCol;
-                    colVals.push_back(newCol);
-                }
-                // otherwise add val to corresponding inner vector
-                else {
-                    // check if val is already accounted for
-                    // TODO: this "check if value exists in given vector" should be a utility function
-                    bool valFound = false;
-                    for (int potVal = 0; potVal < colVals.at(colIdx).size(); potVal++) {
-                        if (colVals.at(colIdx).at(potVal) == val) {
-                            valFound = true;
+                // If the current token is a comma,
+                // we've read a whole string column value
+                // and we need to process it accordingly
+                if (c == ',') {
+                    // check if str is in observedStrs
+                    bool strFound = false;
+                    int savedStrIdx;
+                    for (int obsStrIdx = 0; obsStrIdx < observedStrs.size(); obsStrIdx++) {
+                        if (observedStrs.at(obsStrIdx).compare(str) == 0) {
+                            strFound = true;
+                            savedStrIdx = obsStrIdx;
                         }
                     }
 
-                    // if not, add it
-                    if (!valFound) {
-                        colVals.at(colIdx).push_back(val);
+                    // if it isn't, process it as new column value
+                    if (!strFound) {
+                        // add str to observed strings
+                        observedStrs.push_back(str);
+
+                        // str's index in observed strings is now its integer value
+                        // this is how we ensure unique strings have uniqe integer values
+                        val = observedStrs.size();
+                    }
+                    // if str was found in observed strings,
+                    // we already saved its index and can set val here
+                    else {
+                        // this +1 is because of the off-by-one difference between index and size
+                        val = savedStrIdx + 1;
+                    }
+
+                    // place int val in current row
+                    row.push_back(val);
+
+                    // if we're still on the first line,
+                    // add a new vector to colVals
+                    // i.e., we're still finding new columns
+                    if (firstLine) {
+                        vector<int> newCol;
+                        colVals.push_back(newCol);
+                    }
+                    // otherwise add val to corresponding inner vector of colVals
+                    else {
+                        // check if val is already accounted for
+                        // TODO: this "check if value exists in given vector" should be a utility function
+                        bool valFound = false;
+                        for (int potVal = 0; potVal < colVals.at(colIdx).size(); potVal++) {
+                            if (colVals.at(colIdx).at(potVal) == val) {
+                                valFound = true;
+                            }
+                        }
+
+                        // if not, add it
+                        if (!valFound) {
+                            colVals.at(colIdx).push_back(val);
+                        }
+                    }
+
+                    // increment column index
+                    colIdx++;
+
+                    // reset str
+                    str = "";
+                }
+                // if the current is not a token, concatenate this character token to str
+                else {
+                    str += c;
+                }
+            }
+            
+            // since string stream stops when it hits a newline character,
+            // we have a label string stored in str
+            // this copy pasting of code makes it seem like "process string" should be its own function...
+            string label = str;
+
+            // check if label is in observedStrs
+            bool strFound = false;
+            int savedStrIdx;
+            for (int obsStrIdx = 0; obsStrIdx < observedStrs.size(); obsStrIdx++) {
+                if (observedStrs.at(obsStrIdx).compare(label) == 0) {
+                    strFound = true;
+                    savedStrIdx = obsStrIdx;
+                }
+            }
+
+            // if it isn't, process it as new column value
+            if (!strFound) {
+                // add str to observed strings
+                observedStrs.push_back(label);
+
+                // str's index in observed strings is now its integer value
+                // this is how we ensure unique strings have uniqe integer values
+                val = observedStrs.size();
+            }
+            // if str was found in observed strings,
+            // we already saved its index and can set val here
+            else {
+                // this +1 is because of the off-by-one difference between index and size
+                val = savedStrIdx + 1;
+            }
+
+            // place int val in current row
+            row.push_back(val);
+
+            // if we're still on the first line,
+            // add a new vector to colVals
+            // i.e., we're still finding new columns
+            if (firstLine) {
+                vector<int> newCol;
+                colVals.push_back(newCol);
+            }
+            // otherwise add val to corresponding inner vector of colVals
+            else {
+                // check if val is already accounted for
+                // TODO: this "check if value exists in given vector" should be a utility function
+                bool valFound = false;
+                for (int potVal = 0; potVal < colVals.at(colIdx).size(); potVal++) {
+                    if (colVals.at(colIdx).at(potVal) == val) {
+                        valFound = true;
                     }
                 }
 
-                // If the next token is a comma, ignore it and move on
-                if (ss.peek() == ',') ss.ignore();
-
-                // If the next token is a negative sign, ignore but save it
-                if (ss.peek() == '-') {
-                    neg = true;
-                    ss.ignore();
+                // if not, add it
+                if (!valFound) {
+                    colVals.at(colIdx).push_back(val);
                 }
-
-                // increment column index
-                colIdx++;
             }
+
+            // we've read a whole row now
             // push row into data vector
             data.push_back(row);
 
-            // done with the first line, all columns passed over once
+            // definitely done with the first line, all columns passed over once
             firstLine = false;
         }
         myfile.close();
@@ -655,7 +737,7 @@ void decisionTree::recursiveTrain(vector<vector<int>> binMask, Node * parentNode
 Given a new data row, use built tree to return an int guess
 To be used in loop over vector of new data rows
 */
-int decisionTree::predictSingleRow(vector<int> row) {
+int decisionTree::predictSingleDataPoint(vector<int> row) {
     Node* curNode = &root;
 
     while (curNode->guess == NULL) {
@@ -680,4 +762,18 @@ int decisionTree::predictSingleRow(vector<int> row) {
 
     // we must have hit a node with a non-null guess
     return curNode->guess;
+}
+
+/*
+Generates predictions for a vector of datapoints (rows)
+Simply calls predictSingleDataPoint on each datapoint and appends guess to a vector
+Then returns that vector of guesses
+*/
+vector<int> decisionTree::predictOnDataSet(vector<vector<int>> dataSet) {
+    vector<int> preds;
+    for (int dtaPntIdx = 0; dtaPntIdx < dataSet.size(); dtaPntIdx++) {
+        preds.push_back(predictSingleDataPoint(dataSet.at(dtaPntIdx)));
+    }
+
+    return preds;
 }
